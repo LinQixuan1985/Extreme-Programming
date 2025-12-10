@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>通讯录管理系统</title>
+  <!-- 引入 SheetJS 用于 Excel 导入导出 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f2f5;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      color: #007bff;
+    }
+    .toolbar {
+      margin-bottom: 20px;
+      text-align: right;
+    }
+    .btn {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 8px;
+      font-size: 14px;
+    }
+    .btn-primary { background: #007bff; color: white; }
+    .btn-secondary { background: #6c757d; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    .btn-warning { background: #ffc107; color: black; }
+    .btn-danger { background: #dc3545; color: white; }
+    .form {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .form h2 {
+      margin-bottom: 15px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .contact-fields {
+      margin-top: 10px;
+    }
+    .field-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .field-row input {
+      flex: 1;
+    }
+    .field-row button {
+      padding: 8px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background: #f8f9fa;
+    }
+    .empty {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    .error {
+      color: #dc3545;
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+    }
+    .bookmark {
+      color: #ffc107;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .bookmarked {
+      color: #ff8f00;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>在线联系人管理系统</h1>
+      <div>
+        <button onclick="toggleBookmarkView()" class="btn btn-warning" id="bookmarkToggle">仅显示收藏</button>
+        <button onclick="exportToExcel()" class="btn btn-success">导出 Excel</button>
+        <label class="btn btn-secondary" style="cursor: pointer;">
+          导入 Excel
+          <input type="file" id="importFile" accept=".xlsx, .xls" style="display: none;" />
+        </label>
+      </div>
+    </header>
+
+    <!-- 操作表单 -->
+    <div class="form">
+      <h2 id="formTitle">添加联系人</h2>
+      <div id="errorMessage" class="error" style="display: none;"></div>
+      
+      <input type="hidden" id="editId" />
+      
+      <div class="form-group">
+        <label>姓名 *</label>
+        <input type="text" id="name" required />
+      </div>
+
+      <!-- 电话 -->
+      <div class="form-group">
+        <label>电话号码 *</label>
+        <div id="phoneFields" class="contact-fields">
+          <!-- 动态生成 -->
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addPhoneField()">+ 添加电话</button>
+      </div>
+
+      <!-- 邮箱 -->
+      <div class="form-group">
+        <label>电子邮箱</label>
+        <div id="emailFields" class="contact-fields">
+          <!-- 动态生成 -->
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addEmailField()">+ 添加邮箱</button>
+      </div>
+
+      <!-- 地址 -->
+      <div class="form-group">
+        <label>地址</label>
+        <div id="addressFields" class="contact-fields">
+          <!-- 动态生成 -->
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addAddressField()">+ 添加地址</button>
+      </div>
+
+      <!-- 社交媒体 -->
+      <div class="form-group">
+        <label>社交媒体（如微信、QQ、Twitter）</label>
+        <div id="socialFields" class="contact-fields">
+          <!-- 动态生成 -->
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="addSocialField()">+ 添加社交账号</button>
+      </div>
+
+      <button onclick="saveContact()" class="btn btn-primary">保存</button>
+      <button onclick="cancelEdit()" class="btn btn-secondary">取消</button>
+    </div>
+
+    <!-- 联系人列表 -->
+    <table>
+      <thead>
+        <tr>
+          <th>收藏</th>
+          <th>姓名</th>
+          <th>电话</th>
+          <th>邮箱</th>
+          <th>地址</th>
+          <th>社交</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="contactList">
+        <!-- 数据将通过 JS 动态插入 -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:5000/api/contacts';
+    let allContacts = [];
+    let showBookmarkedOnly = false;
+
+    // 初始化
+    document.addEventListener('DOMContentLoaded', () => {
+      loadContacts();
+      document.getElementById('importFile').addEventListener('change', handleFileImport);
+      addPhoneField(true); // 至少一个电话（必填）
+    });
+
+    // ======================
+    // 表单字段动态管理
+    // ======================
+
+    function createFieldRow(value = '', onRemove) {
+      const row = document.createElement('div');
+      row.className = 'field-row';
+      row.innerHTML = `
+        <input type="text" value="${value}" />
+        <button type="button">×</button>
+      `;
+      row.querySelector('button').onclick = () => {
+        row.remove();
+        if (onRemove) onRemove();
+      };
+      return row;
+    }
+
+    function addPhoneField(isRequired = false) {
+      const container = document.getElementById('phoneFields');
+      const row = createFieldRow();
+      if (isRequired) {
+        row.querySelector('input').required = true;
+      }
+      container.appendChild(row);
+    }
+
+    function addEmailField() {
+      const container = document.getElementById('emailFields');
+      container.appendChild(createFieldRow());
+    }
+
+    function addAddressField() {
+      const container = document.getElementById('addressFields');
+      container.appendChild(createFieldRow());
+    }
+
+    function addSocialField() {
+      const container = document.getElementById('socialFields');
+      container.appendChild(createFieldRow());
+    }
+
+    function getFields(containerId) {
+      const container = document.getElementById(containerId);
+      return Array.from(container.querySelectorAll('input'))
+        .map(input => input.value.trim())
+        .filter(v => v);
+    }
+
+    function setFields(containerId, values) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if (!values || values.length === 0) {
+        if (containerId === 'phoneFields') addPhoneField(true);
+        return;
+      }
+      values.forEach(v => {
+        const row = createFieldRow(v);
+        container.appendChild(row);
+      });
+      if (containerId === 'phoneFields' && container.querySelectorAll('input').length === 0) {
+        addPhoneField(true);
+      }
+    }
+
+    // ======================
+    // 联系人操作
+    // ======================
+
+    async function loadContacts() {
+      try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+        allContacts = data.data || [];
+        renderContacts();
+      } catch (error) {
+        showError('加载联系人失败: ' + error.message);
+      }
+    }
+
+    function renderContacts() {
+      const contacts = showBookmarkedOnly
+        ? allContacts.filter(c => c.is_bookmarked)
+        : allContacts;
+
+      const tbody = document.getElementById('contactList');
+      tbody.innerHTML = '';
+
+      if (contacts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty">${showBookmarkedOnly ? '暂无收藏联系人' : '暂无联系人，请添加一个。'}</td></tr>`;
+        return;
+      }
+
+      contacts.forEach(contact => {
+        const phones = contact.phone_numbers?.join(', ') || '-';
+        const emails = contact.emails?.join(', ') || '-';
+        const addresses = contact.addresses?.join('; ') || '-';
+        const socials = contact.socials?.join(', ') || '-';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><span class="bookmark ${contact.is_bookmarked ? 'bookmarked' : ''}" onclick="toggleBookmark(${contact.id})">★</span></td>
+          <td>${contact.name}</td>
+          <td>${phones}</td>
+          <td>${emails}</td>
+          <td>${addresses}</td>
+          <td>${socials}</td>
+          <td>
+            <button onclick="editContact(${contact.id})" class="btn btn-primary">编辑</button>
+            <button onclick="deleteContact(${contact.id})" class="btn btn-danger">删除</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function saveContact() {
+      const name = document.getElementById('name').value.trim();
+      const phoneNumbers = getFields('phoneFields');
+      if (!name || phoneNumbers.length === 0) {
+        showError('姓名和至少一个电话号码为必填项！');
+        return;
+      }
+
+      const contact = {
+        name,
+        phone_numbers: phoneNumbers,
+        emails: getFields('emailFields'),
+        addresses: getFields('addressFields'),
+        socials: getFields('socialFields')
+      };
+
+      const id = document.getElementById('editId').value;
+
+      try {
+        let response;
+        if (id) {
+          response = await fetch(`${API_URL}/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contact)
+          });
+        } else {
+          response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contact)
+          });
+        }
+
+        if (response.ok) {
+          clearForm();
+          loadContacts();
+        } else {
+          const error = await response.json();
+          showError('操作失败: ' + (error.message || '未知错误'));
+        }
+      } catch (error) {
+        showError('请求失败: ' + error.message);
+      }
+    }
+
+    async function editContact(id) {
+      const contact = allContacts.find(c => c.id === id);
+      if (!contact) return;
+
+      document.getElementById('editId').value = contact.id;
+      document.getElementById('name').value = contact.name;
+
+      setFields('phoneFields', contact.phone_numbers);
+      setFields('emailFields', contact.emails);
+      setFields('addressFields', contact.addresses);
+      setFields('socialFields', contact.socials);
+
+      document.getElementById('formTitle').textContent = '编辑联系人';
+    }
+
+    async function deleteContact(id) {
+      if (!confirm('确定要删除这个联系人吗？')) return;
+
+      try {
+        const response = await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+          loadContacts();
+        } else {
+          showError('删除失败');
+        }
+      } catch (error) {
+        showError('删除请求失败: ' + error.message);
+      }
+    }
+
+    async function toggleBookmark(id) {
+      const contact = allContacts.find(c => c.id === id);
+      if (!contact) return;
+
+      const newStatus = !contact.is_bookmarked;
+      try {
+        const response = await fetch(`${API_URL}/${id}/bookmark`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_bookmarked: newStatus })
+        });
+        if (response.ok) {
+          contact.is_bookmarked = newStatus;
+          renderContacts();
+        }
+      } catch (error) {
+        showError('更新收藏状态失败');
+      }
+    }
+
+    function toggleBookmarkView() {
+      showBookmarkedOnly = !showBookmarkedOnly;
+      const btn = document.getElementById('bookmarkToggle');
+      btn.textContent = showBookmarkedOnly ? '显示全部' : '仅显示收藏';
+      renderContacts();
+    }
+
+    // ======================
+    // 表单控制
+    // ======================
+
+    function clearForm() {
+      document.getElementById('editId').value = '';
+      document.getElementById('name').value = '';
+      document.getElementById('phoneFields').innerHTML = '';
+      document.getElementById('emailFields').innerHTML = '';
+      document.getElementById('addressFields').innerHTML = '';
+      document.getElementById('socialFields').innerHTML = '';
+      addPhoneField(true);
+      document.getElementById('formTitle').textContent = '添加联系人';
+      hideError();
+    }
+
+    function cancelEdit() {
+      clearForm();
+    }
+
+    function showError(message) {
+      const el = document.getElementById('errorMessage');
+      el.textContent = message;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    // ======================
+    // Excel 导入导出
+    // ======================
+
+    function exportToExcel() {
+      const data = allContacts.map(c => ({
+        姓名: c.name,
+        电话: c.phone_numbers?.join('; ') || '',
+        邮箱: c.emails?.join('; ') || '',
+        地址: c.addresses?.join('; ') || '',
+        社交媒体: c.socials?.join('; ') || '',
+        收藏: c.is_bookmarked ? '是' : '否'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "联系人");
+      XLSX.writeFile(wb, "通讯录.xlsx");
+    }
+
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = new Uint8Array(event.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          if (rows.length < 2) {
+            alert('Excel 文件为空或格式不正确');
+            return;
+          }
+
+          // 假设第一行为标题：姓名、电话、邮箱、地址、社交媒体、收藏
+          const headers = rows[0].map(h => h.toString().trim());
+          const contacts = [];
+
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const contact = {};
+            headers.forEach((header, idx) => {
+              const val = row[idx] ?? '';
+              if (header === '姓名') {
+                contact.name = String(val).trim();
+              } else if (header === '电话') {
+                contact.phone_numbers = String(val).split(/[,;；\n]/).map(s => s.trim()).filter(s => s);
+              } else if (header === '邮箱') {
+                contact.emails = String(val).split(/[,;；\n]/).map(s => s.trim()).filter(s => s);
+              } else if (header === '地址') {
+                contact.addresses = String(val).split(/[,;；\n]/).map(s => s.trim()).filter(s => s);
+              } else if (header === '社交媒体') {
+                contact.socials = String(val).split(/[,;；\n]/).map(s => s.trim()).filter(s => s);
+              } else if (header === '收藏') {
+                contact.is_bookmarked = ['是', 'true', '1', 'yes'].includes(String(val).toLowerCase());
+              }
+            });
+
+            if (contact.name && contact.phone_numbers?.length > 0) {
+              contacts.push(contact);
+            }
+          }
+
+          if (contacts.length === 0) {
+            alert('未找到有效联系人数据');
+            return;
+          }
+
+          // 批量导入（逐个 POST）
+          importContactsBatch(contacts);
+        } catch (err) {
+          console.error(err);
+          alert('解析 Excel 失败：' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+      e.target.value = ''; // 允许重复选择同一文件
+    }
+
+    async function importContactsBatch(contacts) {
+      if (!confirm(`即将导入 ${contacts.length} 个联系人，是否继续？`)) return;
+
+      let successCount = 0;
+      for (const contact of contacts) {
+        try {
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(contact)
+          });
+          if (res.ok) successCount++;
+        } catch (err) {
+          console.error('导入失败:', contact, err);
+        }
+      }
+      alert(`导入完成！成功 ${successCount}/${contacts.length} 条`);
+      loadContacts();
+    }
+  </script>
+</body>
+</html>
